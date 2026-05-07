@@ -1,0 +1,49 @@
+
+services:
+  aspire:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    ports:
+      - "18888:18888"   # dashboard UI
+      - "4317:18889"    # OTLP/gRPC (host)
+      - "4318:18890"    # OTLP/HTTP (host)
+    environment:
+      - ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+
+  bot:
+    build: ./apps/bot
+    ports:
+      - "3978:3978"
+    environment:
+      - PORT=3978
+      # Aspire dashboard OTLP/HTTP is container port 18890
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=agents-demo-bot
+      - API_BASE_URL=http://api:3001
+      # Azure Bot Service credentials — copy .env.example to .env and fill in values
+      - connections__serviceConnection__settings__clientId=${BOT_CLIENT_ID}
+      - connections__serviceConnection__settings__clientSecret=${BOT_CLIENT_SECRET}
+      - connections__serviceConnection__settings__tenantId=${BOT_TENANT_ID}
+
+  api:
+    build: ./apps/api
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=agents-demo-api
+      - WORKER_BASE_URL=http://worker:3002
+      - BOT_NOTIFY_URL=http://bot:3978/api/notify
+
+  worker:
+    build: ./apps/worker
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=agents-demo-worker
+      - FAIL_RATE=0.2

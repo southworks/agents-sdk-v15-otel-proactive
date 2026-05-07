@@ -1,55 +1,52 @@
 # Contributing
 
-Thank you for reading the contributing guidelines of the project. It will help you to make great contributions like reporting issues, creating feature requests, and submitting pull requests.
+Thank you for contributing. This repository is a small educational sample, so the main goal is to keep the code and docs easy to understand, easy to run, and aligned with the observable workflow the repo is trying to demonstrate.
 
-## Issues, Feature Request & Questions
+## Before You Change Anything
 
-Before submitting **issues**, **feature requests**, or **questions**, please do a quick search in [Open Issues]() to verify if it was already created. If there is an existing issue, add your comments to that one. 
+- Read [README.md](./README.md) and [GETTING_STARTED.md](./GETTING_STARTED.md)
+- Keep changes scoped to one concern when possible
+- Prefer simple changes over introducing extra abstractions
+- Update documentation when behavior, commands, or file layout changes
 
-### Writing Great Issues & Feature Requests
+## Reporting Issues or Proposing Changes
 
-- Provide reproducible steps, what the result of the steps was, and what you expected to happen.
-- Avoid listing multiple bugs or requests in the same issue. Always write a single bug or feature request per issue. 
-- Avoid adding your issue as a comment to an existing one unless it's for the exact input. Issues can look similar, but have different causes.
-- Add screenshots or animated GIFs.
+- Provide clear reproduction steps
+- Describe the current behavior and the expected behavior
+- Keep one issue or proposal per topic
+- Include logs, screenshots, or trace screenshots when they help explain the problem
 
-### Submitting Issues 
+## Development Guidelines
 
-1. Go to the [Issues]() page, click on [New issue]().
-2. Select the **template**. Choose the one that fits to your case. 
-   1. Bug
-   2. Documentation Bug
-   3. Feature request
-   4. Question
-3. Fill the issue template. Remember to follow the best practices to write Issues and Feature requests.
+- Preserve the repo's existing structure under `apps/`, `docs/`, and `scripts/`
+- Keep the sample runnable with `docker compose up --build`
+- Do not add infrastructure or dependencies unless they directly improve the sample
+- Prefer documentation that explains why the sample exists, not just what files it contains
+- If you change the demo flow, update the related docs in `docs/`
 
-## Develop Guidelines
+## Branching
 
-### Branching Model
+Use short, descriptive branch names. These patterns work well for this repo:
 
-- **Main**: Accepts merges from Features/Issues and Hotfixes
-- **Features/Issues**: Always branch off from Main
-  
-  - Prefix: action/* e.g.: `add/new-command`, `fix/message-issue`
-    
-  >  Actions available: `add`, `update`, `fix`, and `remove`
-  
-- **Hotfix**: Always branch off from Main
-  
-  - Prefix: hotfix/* e.g.: `hotfix/remove-duplicate-load-data`
+- `add/<topic>`
+- `update/<topic>`
+- `fix/<topic>`
+- `remove/<topic>`
 
-### Submit contribution
+Examples:
 
-Pull Requests are a great way to keep track of tasks, enhancements, and bugs for the projects. When we are writing them, we must think about how the rest of the team is going to read it? What kind of information we will place in it to make it easy to read and understand their changes?. Follow these practices to help you to write great pull requests.
+- `fix/readme-links`
+- `add/manual-run-notes`
+- `update/worker-error-flow`
 
-#### Writing great pull requests
+## Pull Requests
 
-- Choose a descriptive title and add the context of the changes using brakes. 
-  - ex: `[gRPC] Add a method`, `[Mux] Add a new route`
-- If the pull request fixes an issue:
-  - Add the name of the issue as the title. 
-    -  e.g.: ISSUE #03: `Use S3 instead of DynamoDB` ---> PR Title: `[ISSUE#03] Use S3 instead of DynamoDB`
-  - Add the number of the related issue at the beginning following the pull request template.
-    -  e.g.: `Fixes #03` 
-- Provide all the information about the changes made in the pull request.
-- Add screenshots or animated GIFs.
+- Use a descriptive title
+- Explain the user-visible or contributor-visible impact
+- Mention any docs that were updated
+- Include validation details, for example that `docker compose up --build` still works
+- If relevant, include screenshots from Aspire Dashboard or Playground
+
+## Code of Conduct
+
+By participating in this project, you agree to follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
