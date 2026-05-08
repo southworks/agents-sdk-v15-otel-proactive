@@ -1,6 +1,7 @@
 
 import express from 'express';
 import axios from 'axios';
+import { context, propagation } from '@opentelemetry/api';
 import {
   AgentApplication,
   CloudAdapter,
@@ -67,7 +68,18 @@ app.onActivity('message', async (ctx: TurnContext) => {
     },
     async () => {
       await ctx.sendActivity(`✅ Received: ${fileName}. Processing...`);
-      await axios.post(`${apiBaseUrl}/upload`, { fileName, convId });
+
+      // Capture the active span context so the API (and downstream worker)
+      // can be stitched into the same distributed trace.
+      const traceHeaders: Record<string, string> = {};
+      propagation.inject(context.active(), traceHeaders);
+
+      // Fire-and-forget: reply to the user immediately; proactive message
+      // will arrive once the worker finishes (3-8 s later).
+      void axios
+        .post(`${apiBaseUrl}/upload`, { fileName, convId }, { headers: traceHeaders })
+        .catch((err) => console.error('[upload] API call failed:', err?.message));
+
       await ctx.sendActivity('⏳ Processing started. You will get a proactive update soon.');
     }
   );
@@ -120,10 +132,16 @@ server.post('/api/notify', async (req, res) => {
         ? `⚠️ Finished processing ${fileName ?? ''} with LOW CONFIDENCE (mock).`
         : `✅ Finished processing ${fileName ?? ''} successfully (mock).`;
 
-    await app.proactive.sendActivity(adapter, convId, {
-      type: 'message',
-      text,
-    } as any);
+    // Extract the W3C trace context forwarded by the API so the proactive
+    // send span is attached to the same trace as the original bot turn.
+    const parentContext = propagation.extract(context.active(), req.headers);
+
+    await context.with(parentContext, async () => {
+      await app.proactive.sendActivity(adapter, convId, {
+        type: 'message',
+        text,
+      } as any);
+    });
 
     res.json({ ok: true });
   } catch (error) {

@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { trace, SpanStatusCode, metrics } from '@opentelemetry/api';
+import { context, propagation, trace, SpanStatusCode, metrics } from '@opentelemetry/api';
 
 import { initOtel } from './otel';
 
@@ -23,11 +23,15 @@ const failRate = Number(process.env.FAIL_RATE ?? '0.2');
 app.post('/process', async (req, res) => {
   const { fileName, convId } = req.body ?? {};
 
-  await tracer.startActiveSpan('worker.process_document', async (span) => {
+  // Explicitly extract the W3C trace context from the incoming request so
+  // this span becomes a child of the API's span in the distributed trace.
+  const parentContext = propagation.extract(context.active(), req.headers);
+
+  await tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
     span.setAttribute('demo.file.name', fileName ?? '');
     span.setAttribute('demo.conversation.id', convId ?? '');
 
-    const delayMs = 800 + Math.floor(Math.random() * 1200);
+    const delayMs = 1000 + Math.floor(Math.random() * 2000);
     await new Promise((r) => setTimeout(r, delayMs));
 
     const forceFail = typeof fileName === 'string' && fileName.toLowerCase().includes('fail');

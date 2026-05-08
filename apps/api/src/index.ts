@@ -1,7 +1,7 @@
 
 import express from 'express';
 import axios from 'axios';
-import { trace, SpanStatusCode } from '@opentelemetry/api';
+import { context, propagation, trace, SpanStatusCode } from '@opentelemetry/api';
 
 import { initOtel } from './otel';
 
@@ -23,15 +23,24 @@ app.post('/upload', async (req, res) => {
     return;
   }
 
-  await tracer.startActiveSpan('api.upload_received', async (span) => {
+  // Explicitly extract the W3C trace context from the incoming request so
+  // this span becomes a child of the bot's span.  Auto-instrumentation alone
+  // is not reliable here because the express async wrapper can lose context.
+  const parentContext = propagation.extract(context.active(), req.headers);
+
+  await tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
     span.setAttribute('demo.file.name', fileName ?? '');
     span.setAttribute('demo.conversation.id', convId);
+
+    // Inject the now-active api span so worker + bot/notify appear as its children.
+    const traceHeaders: Record<string, string> = {};
+    propagation.inject(context.active(), traceHeaders);
 
     let result: 'success' | 'warning' | 'failure' = 'success';
     let errorMessage: string | undefined;
 
     try {
-      const workerResp = await axios.post(`${workerBaseUrl}/process`, { fileName, convId });
+      const workerResp = await axios.post(`${workerBaseUrl}/process`, { fileName, convId }, { headers: traceHeaders });
       result = workerResp.data?.result ?? 'success';
     } catch (err: any) {
       result = 'failure';
@@ -40,7 +49,7 @@ app.post('/upload', async (req, res) => {
       span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
     }
 
-    await axios.post(botNotifyUrl, { convId, result, fileName, errorMessage });
+    await axios.post(botNotifyUrl, { convId, result, fileName, errorMessage }, { headers: traceHeaders });
 
     span.end();
   });
