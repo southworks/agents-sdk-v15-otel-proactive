@@ -15,9 +15,8 @@ services:
       - "3978:3978"
     environment:
       - PORT=3978
-      # Aspire dashboard OTLP/HTTP is container port 18890
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      # Aspire dashboard OTLP/gRPC is container port 18889
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18889
       - OTEL_SERVICE_NAME=agents-demo-bot
       - API_BASE_URL=http://api:3001
       # Azure Bot Service credentials — copy .env.example to .env and fill in values
@@ -31,8 +30,7 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18889
       - OTEL_SERVICE_NAME=agents-demo-api
       - WORKER_BASE_URL=http://worker:3002
       - BOT_NOTIFY_URL=http://bot:3978/api/notify
@@ -43,7 +41,6 @@ services:
       - "3002:3002"
     environment:
       - PORT=3002
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18889
       - OTEL_SERVICE_NAME=agents-demo-worker
       - FAIL_RATE=0.2

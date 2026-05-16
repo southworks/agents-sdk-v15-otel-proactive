@@ -68,7 +68,8 @@ const shutdownHandler = () => {
     .catch((error) => {
       console.error('Error shutting down OTel SDK', error);
       process.exitCode = 1;
-    });
+    })
+    .finally(() => process.exit());
 };
 
 process.on('SIGTERM', shutdownHandler);
