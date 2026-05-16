@@ -1,19 +1,8 @@
 
 import express from 'express';
-import { context, propagation, trace, SpanStatusCode, metrics } from '@opentelemetry/api';
+import { context, propagation, SpanStatusCode } from '@opentelemetry/api';
 
-import { initOtel } from './otel';
-
-initOtel(process.env.OTEL_SERVICE_NAME ?? 'agents-demo-worker');
-
-const tracer = trace.getTracer('agents-demo-worker');
-
-// Custom metric: processing duration histogram
-const meter = metrics.getMeter('agents-demo-worker');
-const durationHistogram = meter.createHistogram('demo.worker.processing.duration.ms', {
-  description: 'Mock processing duration in milliseconds',
-  unit: 'ms',
-});
+import { WorkerTelemetry } from './workerTelemetry';
 
 const app = express();
 app.use(express.json());
@@ -27,7 +16,7 @@ app.post('/process', async (req, res) => {
   // this span becomes a child of the API's span in the distributed trace.
   const parentContext = propagation.extract(context.active(), req.headers);
 
-  await tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
+  await WorkerTelemetry.tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
     span.setAttribute('demo.file.name', fileName ?? '');
     span.setAttribute('demo.conversation.id', convId ?? '');
 
@@ -44,7 +33,7 @@ app.post('/process', async (req, res) => {
       span.end();
 
       // Record the metric even for failures
-      durationHistogram.record(delayMs, { result: 'failure' });
+      WorkerTelemetry.processingDuration.record(delayMs, { result: 'failure' });
 
       res.status(500).json({ error: error.message, delayMs });
       return;
@@ -54,7 +43,7 @@ app.post('/process', async (req, res) => {
     span.setAttribute('demo.result', result);
     span.end();
 
-    durationHistogram.record(delayMs, { result });
+    WorkerTelemetry.processingDuration.record(delayMs, { result });
 
     res.json({ result, delayMs });
   });

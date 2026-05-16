@@ -1,13 +1,9 @@
 
 import express from 'express';
 import axios from 'axios';
-import { context, propagation, trace, SpanStatusCode } from '@opentelemetry/api';
+import { context, propagation, SpanStatusCode } from '@opentelemetry/api';
 
-import { initOtel } from './otel';
-
-initOtel(process.env.OTEL_SERVICE_NAME ?? 'agents-demo-api');
-
-const tracer = trace.getTracer('agents-demo-api');
+import { ApiTelemetry } from './apiTelemetry';
 
 const app = express();
 app.use(express.json());
@@ -28,7 +24,7 @@ app.post('/upload', async (req, res) => {
   // is not reliable here because the express async wrapper can lose context.
   const parentContext = propagation.extract(context.active(), req.headers);
 
-  await tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
+  await ApiTelemetry.tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
     span.setAttribute('demo.file.name', fileName ?? '');
     span.setAttribute('demo.conversation.id', convId);
 
