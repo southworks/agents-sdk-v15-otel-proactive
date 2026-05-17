@@ -121,8 +121,9 @@ await BotTelemetry.tracer.startActiveSpan('demo.bot.upload.route_handler', async
 
     span.setStatus({ code: SpanStatusCode.OK });
   } catch (error: unknown) {
-    span.recordException(error as Error);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+    const err = error instanceof Error ? error : new Error(String(error));
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
     throw error;
   } finally {
     span.end();
@@ -158,10 +159,12 @@ await ApiTelemetry.tracer.startActiveSpan('api.upload_received', {}, parentConte
   const traceHeaders: Record<string, string> = {};
   propagation.inject(context.active(), traceHeaders);
 
-  await axios.post(`${workerBaseUrl}/process`, body, { headers: traceHeaders });
-  await axios.post(botNotifyUrl, body, { headers: traceHeaders });
-
-  span.end();
+  try {
+    await axios.post(`${workerBaseUrl}/process`, body, { headers: traceHeaders });
+    await axios.post(botNotifyUrl, body, { headers: traceHeaders });
+  } finally {
+    span.end();
+  }
 });
 ```
 

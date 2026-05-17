@@ -50,8 +50,11 @@ app.post('/upload', async (req, res) => {
         try {
           await axios.post(botNotifyUrl, { convId, result, fileName, errorMessage }, { headers: traceHeaders });
         } catch (err: any) {
+          const notifyErrorMessage = err?.response?.data?.error ?? err?.message ?? 'bot notify call failed';
+          span.recordException(err);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: notifyErrorMessage });
           // eslint-disable-next-line no-console
-          console.error('[notify] Bot notify call failed:', err?.message);
+          console.error('[notify] Bot notify call failed:', notifyErrorMessage);
         }
 
         if (!res.headersSent) {
