@@ -24,33 +24,50 @@ app.post('/upload', async (req, res) => {
   // is not reliable here because the express async wrapper can lose context.
   const parentContext = propagation.extract(context.active(), req.headers);
 
-  await ApiTelemetry.tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
-    span.setAttribute('demo.file.name', fileName ?? '');
-    span.setAttribute('demo.conversation.id', convId);
+  try {
+    await ApiTelemetry.tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
+      try {
+        span.setAttribute('demo.file.name', fileName ?? '');
+        span.setAttribute('demo.conversation.id', convId);
 
-    // Inject the now-active api span so worker + bot/notify appear as its children.
-    const traceHeaders: Record<string, string> = {};
-    propagation.inject(context.active(), traceHeaders);
+        // Inject the now-active api span so worker + bot/notify appear as its children.
+        const traceHeaders: Record<string, string> = {};
+        propagation.inject(context.active(), traceHeaders);
 
-    let result: 'success' | 'warning' | 'failure' = 'success';
-    let errorMessage: string | undefined;
+        let result: 'success' | 'warning' | 'failure' = 'success';
+        let errorMessage: string | undefined;
 
-    try {
-      const workerResp = await axios.post(`${workerBaseUrl}/process`, { fileName, convId }, { headers: traceHeaders });
-      result = workerResp.data?.result ?? 'success';
-    } catch (err: any) {
-      result = 'failure';
-      errorMessage = err?.response?.data?.error ?? err?.message ?? 'worker call failed';
-      span.recordException(err);
-      span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+        try {
+          const workerResp = await axios.post(`${workerBaseUrl}/process`, { fileName, convId }, { headers: traceHeaders });
+          result = workerResp.data?.result ?? 'success';
+        } catch (err: any) {
+          result = 'failure';
+          errorMessage = err?.response?.data?.error ?? err?.message ?? 'worker call failed';
+          span.recordException(err);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+        }
+
+        try {
+          await axios.post(botNotifyUrl, { convId, result, fileName, errorMessage }, { headers: traceHeaders });
+        } catch (err: any) {
+          // eslint-disable-next-line no-console
+          console.error('[notify] Bot notify call failed:', err?.message);
+        }
+
+        if (!res.headersSent) {
+          res.json({ ok: true });
+        }
+      } finally {
+        span.end();
+      }
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Upload handler failed', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Upload processing failed' });
     }
-
-    await axios.post(botNotifyUrl, { convId, result, fileName, errorMessage }, { headers: traceHeaders });
-
-    span.end();
-  });
-
-  res.json({ ok: true });
+  }
 });
 
 const port = Number(process.env.PORT ?? 3001);
