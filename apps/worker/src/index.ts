@@ -17,35 +17,38 @@ app.post('/process', async (req, res) => {
   const parentContext = propagation.extract(context.active(), req.headers);
 
   await WorkerTelemetry.tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
-    span.setAttribute('demo.file.name', fileName ?? '');
-    span.setAttribute('demo.conversation.id', convId ?? '');
+    try {
+      span.setAttribute('demo.file.name', fileName ?? '');
+      span.setAttribute('demo.conversation.id', convId ?? '');
 
-    const delayMs = 1000 + Math.floor(Math.random() * 2000);
-    await new Promise((r) => setTimeout(r, delayMs));
+      const delayMs = 1000 + Math.floor(Math.random() * 2000);
+      await new Promise((r) => setTimeout(r, delayMs));
 
-    const forceFail = typeof fileName === 'string' && fileName.toLowerCase().includes('fail');
-    const shouldFail = forceFail || Math.random() < failRate;
+      const forceFail = typeof fileName === 'string' && fileName.toLowerCase().includes('fail');
+      const shouldFail = forceFail || Math.random() < failRate;
 
-    if (shouldFail) {
-      const error = new Error('Mock processing failure');
-      span.recordException(error);
-      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      if (shouldFail) {
+        const error = new Error('Mock processing failure');
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+
+        // Record the metric even for failures
+        WorkerTelemetry.processingDuration.record(delayMs, { result: 'failure' });
+
+        res.status(500).json({ error: error.message, delayMs });
+        return;
+      }
+
+      const result = Math.random() > 0.5 ? 'success' : 'warning';
+      span.setAttribute('demo.result', result);
+      span.setStatus({ code: SpanStatusCode.OK });
+
+      WorkerTelemetry.processingDuration.record(delayMs, { result });
+
+      res.json({ result, delayMs });
+    } finally {
       span.end();
-
-      // Record the metric even for failures
-      WorkerTelemetry.processingDuration.record(delayMs, { result: 'failure' });
-
-      res.status(500).json({ error: error.message, delayMs });
-      return;
     }
-
-    const result = Math.random() > 0.5 ? 'success' : 'warning';
-    span.setAttribute('demo.result', result);
-    span.end();
-
-    WorkerTelemetry.processingDuration.record(delayMs, { result });
-
-    res.json({ result, delayMs });
   });
 });
 
