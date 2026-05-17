@@ -23,27 +23,37 @@ Dashboard as a **single trace waterfall** sharing one `traceId`.
 
 ---
 
-## Why Auto-Instrumentation Alone Is Not Enough
+## OTel Bootstrap: Manual Preloaded Instrumentation
 
-`@opentelemetry/auto-instrumentations-node` patches Node's `http` module to:
-- **Inject** `traceparent` headers into outbound HTTP requests
-- **Extract** `traceparent` from incoming HTTP requests and set an active context
+Each service bootstraps OpenTelemetry through a dedicated `instrumentation.ts` module
+that is **preloaded before `index.ts`** using Node's `--import` flag:
 
-However, the extraction side only works if the active context survives the full async
-call chain through Express middleware. In practice, when using `async` route handlers
-with `await`, the `AsyncLocalStorage` scope can be broken by intermediate middleware,
-causing `startActiveSpan` to see no active parent and mint a new root `traceId`.
+```
+node --import ./dist/instrumentation.js ./dist/index.js
+```
 
-The result is exactly what was observed: **three separate, independent traces** in
-Aspire Dashboard, even though the HTTP headers carrying the trace context were present
-on every request.
+The module configures a `NodeSDK` instance with:
+
+| Signal  | Exporter (when `OTEL_EXPORTER_OTLP_ENDPOINT` is set) | Fallback (local dev) |
+|---------|------------------------------------------------------|----------------------|
+| Traces  | `OTLPTraceExporter` (gRPC)                           | `ConsoleSpanExporter` |
+| Metrics | `OTLPMetricExporter` (gRPC)                          | `ConsoleMetricExporter` |
+| Logs    | `OTLPLogExporter` (gRPC)                             | `ConsoleLogRecordExporter` |
+
+Export intervals are configurable via `OTEL_METRICS_EXPORT_INTERVAL` and
+`OTEL_LOGS_EXPORT_INTERVAL` (defaults: 5000 ms). The module also registers
+`SIGTERM`/`SIGINT` handlers that flush the SDK and call `process.exit()`.
+
+`@microsoft/agents-telemetry` and `@opentelemetry/auto-instrumentations-node` are **not
+used**. Instead, each service explicitly propagates W3C trace context across HTTP
+boundaries (see below).
 
 ---
 
-## The Fix: Explicit Propagation
+## Why Explicit Propagation Is Required
 
-Rather than relying on auto-instrumentation's ambient context propagation, each service
-explicitly handles context at every service boundary.
+Rather than relying on a framework to inject/extract context automatically, each service
+explicitly handles trace context at every service boundary.
 
 ### Pattern
 
@@ -93,15 +103,32 @@ await context.with(parentContext, async () => {
 
 ### `apps/bot/src/index.ts` — Upload handler
 
-Injects the active bot span into the fire-and-forget `/upload` call to the API:
+Creates the root span `demo.bot.upload.route_handler` and injects trace context into
+the fire-and-forget `/upload` call to the API:
 
 ```typescript
-const traceHeaders: Record<string, string> = {};
-propagation.inject(context.active(), traceHeaders);
+await BotTelemetry.tracer.startActiveSpan('demo.bot.upload.route_handler', async (span) => {
+  try {
+    span.setAttribute('demo.file.name', fileName);
+    span.setAttribute('demo.conversation.id', convId);
 
-void axios
-  .post(`${apiBaseUrl}/upload`, { fileName, convId }, { headers: traceHeaders })
-  .catch((err) => console.error('[upload] API call failed:', err?.message));
+    const traceHeaders: Record<string, string> = {};
+    propagation.inject(context.active(), traceHeaders);
+
+    void axios
+      .post(`${apiBaseUrl}/upload`, { fileName, convId }, { headers: traceHeaders })
+      .catch((err: unknown) => { /* log */ });
+
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    throw error;
+  } finally {
+    span.end();
+  }
+});
 ```
 
 The call is **fire-and-forget** (`void`, no `await`) so the bot responds to the user
@@ -128,12 +155,16 @@ its own span context into both downstream calls:
 ```typescript
 const parentContext = propagation.extract(context.active(), req.headers);
 
-await tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
+await ApiTelemetry.tracer.startActiveSpan('api.upload_received', {}, parentContext, async (span) => {
   const traceHeaders: Record<string, string> = {};
   propagation.inject(context.active(), traceHeaders);
 
-  await axios.post(`${workerBaseUrl}/process`, body, { headers: traceHeaders });
-  await axios.post(botNotifyUrl, body, { headers: traceHeaders });
+  try {
+    await axios.post(`${workerBaseUrl}/process`, body, { headers: traceHeaders });
+    await axios.post(botNotifyUrl, body, { headers: traceHeaders });
+  } finally {
+    span.end();
+  }
 });
 ```
 
@@ -144,7 +175,7 @@ Extracts the API's trace context to become a child of the API span:
 ```typescript
 const parentContext = propagation.extract(context.active(), req.headers);
 
-await tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
+await WorkerTelemetry.tracer.startActiveSpan('worker.process_document', {}, parentContext, async (span) => {
   // simulate work ...
   span.end();
 });
@@ -158,14 +189,15 @@ After a successful `upload <file>` command, a single trace entry appears with th
 waterfall structure:
 
 ```
-[agents-demo-bot]   agents route handler
-  └── [HTTP POST /upload]
-        └── [agents-demo-api]   api.upload_received
-              ├── [HTTP POST /process]
-              │     └── [agents-demo-worker]   worker.process_document  (~1–3 s)
-              └── [HTTP POST /api/notify]
-                    └── [agents-demo-bot]   proactive send
+[agents-demo-bot]   demo.bot.upload.route_handler
+  └── [agents-demo-api]   api.upload_received
+        └── [agents-demo-worker]   worker.process_document  (~1–3 s)
 ```
+
+The `api.upload_received` span also covers the call to `POST /api/notify` (bot
+proactive send). That call happens inside the same span context so any internal SDK
+spans it produces share the same `traceId`, but no separate HTTP-level span is created
+because auto-instrumentation is not used.
 
 The `traceId` is the same on every span. Clicking any span in Aspire shows the full
 waterfall, duration breakdown, and any recorded exceptions.

@@ -1,7 +1,7 @@
 
 import express from 'express';
 import axios from 'axios';
-import { context, propagation } from '@opentelemetry/api';
+import { context, propagation, SpanStatusCode } from '@opentelemetry/api';
 import {
   AgentApplication,
   CloudAdapter,
@@ -11,12 +11,7 @@ import {
   authorizeJWT,
   loadAuthConfigFromEnv,
 } from '@microsoft/agents-hosting';
-import { trace, SpanNames, metric } from '@microsoft/agents-telemetry';
-
-import { initOtel } from './otel';
-
-// Initialize OpenTelemetry BEFORE SDK usage.
-initOtel(process.env.OTEL_SERVICE_NAME ?? 'agents-demo-bot');
+import { BotTelemetry } from './botTelemetry';
 
 type AppState = TurnState;
 
@@ -36,9 +31,7 @@ adapter.onTurnError = async (_context, error) => {
 const app = new AgentApplication<AppState>({ storage, adapter });
 
 const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:3001';
-
-// Custom metric: count uploads initiated
-const uploadsCounter = metric.counter('demo.uploads.count');
+const BOT_UPLOAD_ROUTE_HANDLER_SPAN_NAME = 'demo.bot.upload.route_handler';
 
 app.onActivity('message', async (ctx: TurnContext) => {
   const text = (ctx.activity.text ?? '').trim();
@@ -55,18 +48,13 @@ app.onActivity('message', async (ctx: TurnContext) => {
   const fileName = text.split(/\s+/).slice(1).join(' ') || 'demo.pdf';
 
   // Record a metric that the operation started.
-  uploadsCounter.add(1, { 'demo.command': 'upload' });
+  BotTelemetry.uploadsCounter.add(1, { 'demo.command': 'upload' });
 
-  await trace(
-    {
-      name: SpanNames.AGENTS_APP_ROUTE_HANDLER,
-      record: { fileName, convId },
-      end: ({ span, record }) => {
-        span.setAttribute('demo.file.name', record.fileName);
-        span.setAttribute('demo.conversation.id', record.convId);
-      },
-    },
-    async () => {
+  await BotTelemetry.tracer.startActiveSpan(BOT_UPLOAD_ROUTE_HANDLER_SPAN_NAME, async (span) => {
+    try {
+      span.setAttribute('demo.file.name', fileName);
+      span.setAttribute('demo.conversation.id', convId);
+
       await ctx.sendActivity(`✅ Received: ${fileName}. Processing...`);
 
       // Capture the active span context so the API (and downstream worker)
@@ -78,11 +66,22 @@ app.onActivity('message', async (ctx: TurnContext) => {
       // will arrive once the worker finishes (3-8 s later).
       void axios
         .post(`${apiBaseUrl}/upload`, { fileName, convId }, { headers: traceHeaders })
-        .catch((err) => console.error('[upload] API call failed:', err?.message));
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('[upload] API call failed:', message);
+        });
 
       await ctx.sendActivity('⏳ Processing started. You will get a proactive update soon.');
+      span.setStatus({ code: SpanStatusCode.OK });
+    } catch (error: unknown) {
+      const exception = error instanceof Error ? error : new Error(String(error));
+      span.recordException(exception);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: exception.message });
+      throw error;
+    } finally {
+      span.end();
     }
-  );
+  });
 });
 
 const server = express();

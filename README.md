@@ -16,7 +16,7 @@ The repo is intended as an educational baseline you can extend incrementally.
 
 ## What the Sample Shows
 
-- OpenTelemetry wiring for an Agents SDK v1.5 bot through `@microsoft/agents-telemetry`
+- Manual OpenTelemetry bootstrap via preloaded `instrumentation.ts` modules (traces, metrics, logs) for all three services
 - Proactive messaging through `AgentApplication.proactive`
 - A multi-service trace path across bot, API, and worker
 - A failure path that records exceptions and surfaces error spans
