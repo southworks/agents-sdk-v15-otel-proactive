@@ -6,7 +6,7 @@ Modern agents orchestrate workflows across services. Without distributed tracing
 
 Agents SDK **v1.5** helps in two key ways:
 
-1. **New: OpenTelemetry support** via `@microsoft/agents-telemetry` — SDK components are instrumented out-of-the-box; you only need to wire OpenTelemetry exporters early.
+1. **New: Manual OTel bootstrap** — each service preloads an `instrumentation.ts` module via `node --import` that configures gRPC OTLP exporters for traces, metrics, and logs, with a console fallback for local development.
 2. **New: Proactive messaging via `AgentApplication.proactive`** — proactive is now first-class with helpers to store a conversation during a live turn and message later by stored ID.
 
 ## Demo goal
@@ -31,8 +31,20 @@ Later, out-of-turn, the bot sends a message by stored ID:
 
 - `await app.proactive.sendActivity(adapter, convId, { text: '...' })`
 
-## OpenTelemetry (v1.5)
-The bot wires OTLP exporters early (before SDK code runs). Agents SDK emits spans through `@microsoft/agents-telemetry`.
+## OpenTelemetry bootstrap
+Each service (`bot`, `api`, `worker`) preloads a dedicated `instrumentation.ts` module
+via `node --import ./dist/instrumentation.js ./dist/index.js`. The module creates a
+`NodeSDK` instance with:
+
+- **gRPC OTLP exporters** for traces, metrics, and logs when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (targeting Aspire's gRPC port 18889).
+- **Console exporters** as a fallback for local development without a collector.
+- **Configurable export intervals** via `OTEL_METRICS_EXPORT_INTERVAL` and `OTEL_LOGS_EXPORT_INTERVAL`.
+- **Graceful shutdown** — `SIGTERM`/`SIGINT` handlers flush the SDK and call `process.exit()`.
+
+`@microsoft/agents-telemetry` and auto-instrumentation are **not used**. W3C trace
+context is propagated explicitly across every HTTP boundary using
+`propagation.inject()` on the sending side and `propagation.extract()` on the
+receiving side (see `docs/observability.md` for details).
 
 ## Failure scenario (for real-world debugging)
 To illustrate error handling, the worker sometimes fails (HTTP 500) and records an exception on the span.
