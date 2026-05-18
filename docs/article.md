@@ -15,9 +15,9 @@ Agents SDK v1.5 adds first-class support for OpenTelemetry. This post walks thro
 
 These features are not just additive—they remove two common sources of complexity when building observable agent systems.
 
-**OpenTelemetry support (`@microsoft/agents-telemetry`)**
+**OpenTelemetry bootstrap (manual `instrumentation.ts`)**
 
-This means you start with meaningful spans for bot turns without writing custom middleware. Wire up OTLP exporters once at startup — before any SDK code runs — and the framework instruments itself. No custom middleware, no manual span creation for bot turns.
+Each service bootstraps OpenTelemetry through a dedicated `instrumentation.ts` module that is preloaded before `index.ts` using Node's `--import` flag. This gives full control over exporters, metric intervals, and shutdown handlers — without relying on `@microsoft/agents-telemetry` or auto-instrumentation packages. Wire up OTLP exporters once at startup and the SDK instruments itself. Propagation across service boundaries is explicit (inject/extract), which is the main pattern this sample demonstrates.
 
 **Proactive messaging (`AgentApplication.proactive`)**
 
