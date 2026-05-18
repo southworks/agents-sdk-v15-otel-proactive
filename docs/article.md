@@ -129,4 +129,4 @@ If you're working on multi-service agents, background processing, or proactive m
 
 Clone the repo, run the services, and trigger a few upload commands from the Agents Playground. Then open Aspire Dashboard and follow the trace.
 
-The full source code is available here: https://github.com/saltworks/agents-sdk-v15-otel-proactive
+The full source code is available here: https://github.com/southworks/agents-sdk-v15-otel-proactive
