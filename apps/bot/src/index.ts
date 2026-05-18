@@ -136,10 +136,24 @@ server.post('/api/notify', async (req, res) => {
     const parentContext = propagation.extract(context.active(), req.headers);
 
     await context.with(parentContext, async () => {
-      await app.proactive.sendActivity(adapter, convId, {
-        type: 'message',
-        text,
-      } as any);
+      await BotTelemetry.tracer.startActiveSpan('bot.proactive_send', async (span) => {
+        try {
+          span.setAttribute('demo.conversation.id', convId);
+          span.setAttribute('demo.result', result ?? 'unknown');
+          await app.proactive.sendActivity(adapter, convId, {
+            type: 'message',
+            text,
+          } as any);
+          span.setStatus({ code: SpanStatusCode.OK });
+        } catch (error: unknown) {
+          const exception = error instanceof Error ? error : new Error(String(error));
+          span.recordException(exception);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: exception.message });
+          throw error;
+        } finally {
+          span.end();
+        }
+      });
     });
 
     res.json({ ok: true });
