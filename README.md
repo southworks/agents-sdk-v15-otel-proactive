@@ -1,25 +1,26 @@
-# Agents SDK v1.5 OpenTelemetry Proactive Demo
+# Agents SDK v1.5 — Distributed Tracing and Proactive Messaging
 
-This repository started from an open source project template and now hosts a focused sample for **Agents SDK v1.5**, **OpenTelemetry**, and **proactive messaging**. The repo has been cleaned up so the template's standard project docs remain useful while the sample-specific implementation and walkthroughs stay front and center.
+This sample demonstrates **distributed tracing across three services** using OpenTelemetry and the Agents SDK v1.5. A bot, an API, and a worker each run in separate containers; a single user action produces one connected trace waterfall visible in the Aspire Dashboard.
 
-## Goals
+It also showcases `AgentApplication.proactive` — the v1.5 first-class API for sending messages outside of an active user turn — and wires the proactive send into the same trace.
 
-This sample demonstrates one end-to-end agent workflow:
+## End-to-end flow
 
-1. A user sends `upload <filename>` to the bot.
-2. The bot stores the conversation using `AgentApplication.proactive`.
-3. The API forwards work to a worker service.
-4. The worker emits traces, metrics, and optional failures.
-5. The bot sends a proactive completion message back to the user.
+1. User sends `upload <filename>` to the bot.
+2. The bot stores the conversation via `app.proactive.storeConversation(ctx)` and fires a request to the API.
+3. The API forwards work to the worker.
+4. The worker simulates processing (1–3 s) and may fail (HTTP 500).
+5. The API notifies the bot with the result.
+6. The bot sends a proactive completion message via `app.proactive.sendActivity(...)`.
 
-The repo is intended as an educational baseline you can extend incrementally.
+All spans — across all three processes — share one `traceId` through explicit W3C Trace Context propagation.
 
 ## What the Sample Shows
 
+- **Distributed tracing across three services** — bot, API, and worker share one `traceId` via explicit W3C Trace Context propagation
+- **Proactive messaging** via `AgentApplication.proactive` — store a conversation reference during a user turn, send a message back after async work completes
 - Manual OpenTelemetry bootstrap via preloaded `instrumentation.ts` modules (traces, metrics, logs) for all three services
-- Proactive messaging through `AgentApplication.proactive`
-- A multi-service trace path across bot, API, and worker
-- A failure path that records exceptions and surfaces error spans
+- A failure path that records exceptions and surfaces ERROR spans across service boundaries
 - A custom histogram metric: `demo.worker.processing.duration.ms`
 
 ## Quick Start
@@ -63,8 +64,8 @@ More detail: [docs/playground.md](./docs/playground.md)
 
 - [GETTING_STARTED.md](./GETTING_STARTED.md) for setup and local workflow
 - [docs/architecture.md](./docs/architecture.md) for the service flow
-- [docs/decisions.md](./docs/decisions.md) for design choices
-- [docs/article.md](./docs/article.md) for the longer-form write-up
+- [docs/observability.md](./docs/observability.md) for the distributed tracing implementation — explicit W3C propagation across all three services
+- [docs/article.md](./docs/article.md) for the longer-form write-up / blog post
 - [docs/playground.md](./docs/playground.md) for playground usage and troubleshooting
 
 ## Repository Layout

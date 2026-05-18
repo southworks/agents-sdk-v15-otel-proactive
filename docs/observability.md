@@ -188,13 +188,14 @@ waterfall structure:
 ```
 [agents-demo-bot]   demo.bot.upload.route_handler
   └── [agents-demo-api]   api.upload_received
-        └── [agents-demo-worker]   worker.process_document  (~1–3 s)
+        ├── [agents-demo-worker]   worker.process_document  (~1–3 s)
+        └── [agents-demo-bot]     bot.proactive_send
 ```
 
-The `api.upload_received` span also covers the call to `POST /api/notify` (bot
-proactive send). That call happens inside the same span context so any internal SDK
-spans it produces share the same `traceId`, but no separate HTTP-level span is created
-because auto-instrumentation is not used.
+Both `worker.process_document` and `bot.proactive_send` are children of
+`api.upload_received`. The API awaits them sequentially: worker first, then the notify
+call to the bot. The `bot.proactive_send` span carries `demo.conversation.id` and
+`demo.result` attributes.
 
 The `traceId` is the same on every span. Clicking any span in Aspire shows the full
 waterfall, duration breakdown, and any recorded exceptions.
