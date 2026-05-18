@@ -17,7 +17,9 @@ These features are not just additive—they remove two common sources of complex
 
 **OpenTelemetry bootstrap (manual `instrumentation.ts`)**
 
-Each service bootstraps OpenTelemetry through a dedicated `instrumentation.ts` module that is preloaded before `index.ts` using Node's `--import` flag. This gives full control over exporters, metric intervals, and shutdown handlers — without relying on `@microsoft/agents-telemetry` or auto-instrumentation packages. Wire up OTLP exporters once at startup and the SDK instruments itself. Propagation across service boundaries is explicit (inject/extract), which is the main pattern this sample demonstrates.
+Each service bootstraps OpenTelemetry through a dedicated `instrumentation.ts` module that is preloaded before `index.ts` using Node's `--import` flag.
+This gives full control over exporters, metric intervals, and shutdown handlers — without relying on `@microsoft/agents-telemetry` or auto-instrumentation packages.
+Propagation across service boundaries is handled explicitly via inject/extract calls, which is the main pattern this sample demonstrates.
 
 **Proactive messaging (`AgentApplication.proactive`)**
 
