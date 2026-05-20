@@ -136,14 +136,28 @@ immediately without waiting for the worker to finish.
 
 ### `apps/bot/src/index.ts` — Notify handler
 
-Extracts the trace context forwarded by the API and runs `sendActivity` inside
-`context.with()` so the proactive send span joins the same trace:
+Extracts the trace context forwarded by the API and opens a `bot.proactive_send` span
+inside `context.with()` so it joins the same trace as the original bot turn:
 
 ```typescript
 const parentContext = propagation.extract(context.active(), req.headers);
 
 await context.with(parentContext, async () => {
-  await app.proactive.sendActivity(adapter, convId, activity);
+  await BotTelemetry.tracer.startActiveSpan('bot.proactive_send', async (span) => {
+    try {
+      span.setAttribute('demo.conversation.id', convId);
+      span.setAttribute('demo.result', result ?? 'unknown');
+      await app.proactive.sendActivity(adapter, convId, activity);
+      span.setStatus({ code: SpanStatusCode.OK });
+    } catch (error: unknown) {
+      const exception = error instanceof Error ? error : new Error(String(error));
+      span.recordException(exception);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: exception.message });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
 });
 ```
 

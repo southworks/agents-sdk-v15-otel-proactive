@@ -38,35 +38,23 @@ Useful local endpoints:
 - Worker endpoint: `http://localhost:3002/process`
 - Aspire Dashboard UI: `http://localhost:18888`
 
-For a fuller local setup flow, see [GETTING_STARTED.md](./GETTING_STARTED.md).
+For the full setup flow, see [docs/getting-started.md](./docs/getting-started.md).
 
 ## Test with Agents Playground
 
-Install Microsoft 365 Agents Playground:
-
-- Windows: `winget install agentsplayground`
-- npm: `npm install -g @microsoft/m365agentsplayground`
-
-Connect Playground to the bot:
-
-```bash
-agentsplayground -e "http://localhost:3978/api/messages" -c "emulator"
-```
-
-Commands to try:
+Commands to try once Playground is connected:
 
 - `upload demo.pdf`
 - `upload fail-demo.pdf`
 
-More detail: [docs/playground.md](./docs/playground.md)
+Install, connect, and Aspire Dashboard walkthrough: [docs/getting-started.md](./docs/getting-started.md)
 
 ## Documentation
 
-- [GETTING_STARTED.md](./GETTING_STARTED.md) for setup and local workflow
-- [docs/architecture.md](./docs/architecture.md) for the service flow
-- [docs/observability.md](./docs/observability.md) for the distributed tracing implementation — explicit W3C propagation across all three services
-- [docs/article.md](./docs/article.md) for the longer-form write-up / blog post
-- [docs/playground.md](./docs/playground.md) for playground usage and troubleshooting
+- [docs/getting-started.md](./docs/getting-started.md) — Azure Bot setup, credentials, Docker Compose, Playground, Aspire Dashboard
+- [docs/architecture.md](./docs/architecture.md) — components, service roles, and how they connect
+- [docs/observability.md](./docs/observability.md) — how distributed tracing is implemented: explicit W3C propagation across all three services
+- [docs/article.md](./docs/article.md) — the story behind the repo; also published as a blog post
 
 ## Repository Layout
 

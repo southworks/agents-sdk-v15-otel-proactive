@@ -38,7 +38,7 @@ These two features pair well: you can kick off async work, trace it end-to-end, 
 
 ## The sample: upload → process → notify
 
-The repo implements one end-to-end scenario across three containers:
+This example uses a simple end-to-end scenario across three services:
 
 1. User sends `upload <filename>` in the Agents Playground
 2. **Bot** stores the conversation and fires a **fire‑and‑forget** request to the API, so the bot responds immediately while processing continues asynchronously
