@@ -54,7 +54,7 @@ Install, connect, and Aspire Dashboard walkthrough: [docs/getting-started.md](./
 - [docs/getting-started.md](./docs/getting-started.md) — Azure Bot setup, credentials, Docker Compose, Playground, Aspire Dashboard
 - [docs/architecture.md](./docs/architecture.md) — components, service roles, and how they connect
 - [docs/observability.md](./docs/observability.md) — how distributed tracing is implemented: explicit W3C propagation across all three services
-- [docs/article.md](./docs/article.md) — the story behind the repo; also published as a blog post
+- [docs/agents-distributed-tracing.md](./docs/agents-distributed-tracing.md) — the story behind the repo; also published as a blog post
 
 ## Repository Layout
 
