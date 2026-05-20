@@ -4,7 +4,7 @@ Thank you for contributing. This repository is a small educational sample, so th
 
 ## Before You Change Anything
 
-- Read [README.md](./README.md) and [GETTING_STARTED.md](./GETTING_STARTED.md)
+- Read [README.md](./README.md) and [docs/getting-started.md](./docs/getting-started.md)
 - Keep changes scoped to one concern when possible
 - Prefer simple changes over introducing extra abstractions
 - Update documentation when behavior, commands, or file layout changes
